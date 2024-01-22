@@ -4,7 +4,7 @@ mod merge;
 mod script;
 mod tun;
 
-pub(self) use self::field::*;
+use self::field::*;
 
 use self::{chain::*, merge::*, script::*, tun::*};
 use crate::config::Config;
@@ -24,9 +24,9 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
         let verge = verge.latest();
         (
             verge.clash_core.clone(),
-            verge.enable_tun_mode.clone().unwrap_or(false),
-            verge.enable_builtin_enhanced.clone().unwrap_or(true),
-            verge.enable_clash_fields.clone().unwrap_or(true),
+            verge.enable_tun_mode.unwrap_or(false),
+            verge.enable_builtin_enhanced.unwrap_or(true),
+            verge.enable_clash_fields.unwrap_or(true),
         )
     };
 
@@ -35,18 +35,18 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
         let profiles = Config::profiles();
         let profiles = profiles.latest();
 
-        let current = profiles.current_mapping().unwrap_or(Mapping::new());
+        let current = profiles.current_mapping().unwrap_or_default();
 
         let chain = match profiles.chain.as_ref() {
             Some(chain) => chain
                 .iter()
                 .filter_map(|uid| profiles.get_item(uid).ok())
-                .filter_map(|item| <Option<ChainItem>>::from(item))
+                .filter_map(<Option<ChainItem>>::from)
                 .collect::<Vec<ChainItem>>(),
             None => vec![],
         };
 
-        let valid = profiles.valid.clone().unwrap_or(vec![]);
+        let valid = profiles.valid.clone().unwrap_or_default();
 
         (current, chain, valid)
     };
@@ -96,16 +96,15 @@ pub fn enhance() -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
             .for_each(|item| {
                 log::debug!(target: "app", "run builtin script {}", item.uid);
 
-                match item.data {
-                    ChainType::Script(script) => match use_script(script, config.to_owned()) {
+                if let ChainType::Script(script) = item.data {
+                    match use_script(script, config.to_owned()) {
                         Ok((res_config, _)) => {
                             config = use_filter(res_config, &clash_fields, enable_filter);
                         }
                         Err(err) => {
                             log::error!(target: "app", "builtin script error `{err}`");
                         }
-                    },
-                    _ => {}
+                    }
                 }
             });
     }
